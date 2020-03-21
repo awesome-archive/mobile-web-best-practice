@@ -2,13 +2,13 @@
   <div class="layout__page">
     <div class="layout__header">
       <van-nav-bar :title="isEdit ? '编辑任务集' : '新建任务集'"
-                   left-text="返回"
                    :right-text="isEdit ? '删除' : ''"
                    left-arrow
                    @click-left="handleClickLeft"
                    @click-right="confirmDeleteNotebook" />
     </div>
-    <div class="layout__body">
+    <div class="layout__body"
+         v-touch:swipe="handleSwipeRight">
       <van-cell-group class="notebook__create-form">
         <van-field v-model="formModel.name"
                    label="任务集名称"
@@ -17,7 +17,7 @@
                    required />
         <van-cell title="任务集主题色"
                   :value="themeColorText"
-                  @click="selectThemeColorShow=true"
+                  @click="setSelectThemeColorShow(true)"
                   is-link></van-cell>
       </van-cell-group>
       <div class="bottom-button--submit"
@@ -32,16 +32,17 @@
       <van-picker show-toolbar
                   title="选择主题色"
                   :columns="THEME_COLOR_ARRAY"
-                  @cancel="selectThemeColorShow = false"
+                  @cancel="setSelectThemeColorShow(false)"
                   @confirm="handleSelectThemeColor" />
     </van-popup>
   </div>
 </template>
 
-<script lang='ts'>
-import { Component, Vue } from 'vue-property-decorator';
+<script lang="ts">
+import { Component, Vue, Mixins } from 'vue-property-decorator';
 import ValidatorUtils from '@/utils/validate';
-import notebookInteractor from '@/use-cases/notebook-interactor';
+import SwipeRightMixin from '@/utils/swipe-right-mixin';
+import { notebookInteractor } from '@/core';
 import { THEME_COLOR_MAP, THEME_COLOR_ARRAY } from '@/constants/notebook';
 import { INotebook, ValidateError } from '@/types';
 
@@ -67,15 +68,16 @@ Vue.use(NavBar)
 @Component({
   components: {}
 })
-export default class NotebookCreate extends Vue {
+export default class NotebookCreate extends Mixins(SwipeRightMixin) {
   private get id() {
-    return this.$route.params.id
-      ? parseInt(this.$route.params.id, 10)
-      : undefined;
+    if (typeof this.$route.query.id === 'string') {
+      return parseInt(this.$route.query.id, 10);
+    }
+    return undefined;
   }
 
   private get isEdit() {
-    return this.$route.name === 'notebook.edit';
+    return !!this.id;
   }
 
   private get themeColorText() {
@@ -102,8 +104,12 @@ export default class NotebookCreate extends Vue {
     this.$router.go(-1);
   }
 
+  private setSelectThemeColorShow(val: boolean) {
+    this.selectThemeColorShow = val;
+  }
+
   private handleSelectThemeColor(val: AnyObject) {
-    this.selectThemeColorShow = false;
+    this.setSelectThemeColorShow(false);
     this.formModel.themeColor = val.value;
   }
 
@@ -119,6 +125,7 @@ export default class NotebookCreate extends Vue {
   private async handleDeleteNotebook(id: number) {
     try {
       await notebookInteractor.deleteNotebook(id);
+      this.$bus.emit('notebook-change');
       this.$router.go(-1);
     } catch (error) {
       console.log(error);
@@ -132,7 +139,7 @@ export default class NotebookCreate extends Vue {
         try {
           const { formModel, id } = this;
           await notebookInteractor.saveNotebook(formModel, id);
-
+          this.$bus.emit('notebook-change');
           this.$router.go(-1);
         } catch (error) {
           console.log(error);
@@ -166,6 +173,7 @@ export default class NotebookCreate extends Vue {
   }
 }
 </script>
+
 <style lang="less" scoped>
 .notebook__create-form {
   margin-top: 20px;

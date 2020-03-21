@@ -14,9 +14,7 @@
 
   "MockEnabled": true,
 
-  "VuePageStackEnabled": true,
+  "OfflinePackageEnabled": true,
 
-  "PreRenderEnabled": false,
-
-  "ListQueryCount": 5
+  "ListQueryCount": 10
 }

@@ -2,51 +2,39 @@
 
 > 本项目以基于 [vue-cli3](https://cli.vuejs.org/) 和 [typescript](http://www.typescriptlang.org/) 搭建的 Todo 应用为例，阐述了在使用 web 进行移动端开发中的一些最佳实践方案(并不局限于 [Vue](https://cn.vuejs.org/) 框架)。另外其中很多方案同样适用于 PC 端 Web 开发。
 
-笔者会不定期地将实践中的最佳方案更新到本项目中，最近计划是 hybrid 离线包方案和微前端方案。
+笔者会不定期地将实践中的最佳方案更新到本项目中。
 
 ## 在线体验
 
 该 Todo 应用交互简洁实用，另外无需服务器，而是将数据保存到 webview 的 indexDB 中，可保证数据安全，欢迎在实际工作生活中使用。效果图如下：
 
-<img src="./assets/memo.gif" width=320/>
+<img src="https://i.loli.net/2020/02/29/oIO5UfnqlGgzmQ8.gif" width=320/>
 
-| 体验平台 | 二维码                                           | 链接                                            |
-| -------- | ------------------------------------------------ | ----------------------------------------------- |
-| Web      | <img src="./assets/mwbp.png" width=140>          | [点击体验](http://www.mcuking.club)             |
-| Android  | <img src="./assets/mwbpcontainer.png" width=140> | [点击体验](https://www.pgyer.com/mwbpcontainer) |
+| 体验平台 | 二维码                                                                    | 链接                                            | 备注             |
+| -------- | ------------------------------------------------------------------------- | ----------------------------------------------- | ---------------- |
+| Web      | <img src="https://i.loli.net/2020/02/29/ViNRUteSbY1IZPa.png"  width=140/> | [点击体验](https://www.mcuking.club)            |                  |
+| Android  | <img src="https://i.loli.net/2020/02/29/wEqfsCRKnI2XP7V.png" width=140/>  | [点击体验](https://www.pgyer.com/mwbpcontainer) | 安装密码：123456 |
 
 ## 目录
 
-- [项目分层架构](#项目分层架构)
-  - [Services 层](#services-层)
-  - [Entities 层](#entities-层)
-  - [Interactors 层](#interactors-层)
-- [组件库](#组件库)
-- [JSBridge](#jsbridge)
-- [路由堆栈管理（模拟原生 APP 导航）](#路由堆栈管理模拟原生-app-导航)
-- [请求数据缓存](#请求数据缓存)
-- [Webpack 策略](#webpack-策略)
-  - [基础库抽离](#基础库抽离)
-- [离线化](#离线化)
+- [分层架构](#分层架构)
 - [微前端](#微前端)
-- [构建时预渲染](#构建时预渲染)
-- [手势库](#手势库)
+- [离线包](#离线包)
+- [JSBridge](#jsbridge)
+- [异常监控](#异常监控)
+- [页面状态保持](#页面状态保持)
+- [请求数据缓存](#请求数据缓存)
+- [限制原生接口调用](#限制原生接口调用)
 - [样式适配](#样式适配)
 - [表单校验](#表单校验)
-- [通过 UA 获取设备信息](#通过-ua-获取设备信息)
-- [mock 数据](#mock-数据)
+- [手势库](#手势库)
+- [Webpack 策略](#webpack-策略)
 - [调试控制台](#调试控制台)
 - [抓包工具](#抓包工具)
-- [异常监控平台](#异常监控平台)
-- [性能监控平台](#性能监控平台)
 - [部署](#部署)
-  - [Docker 安装](#docker-安装)
-  - [Jenkins 安装和配置](#jenkins-安装和配置)
-  - [关联 Jenkins 和 Github](#关联-jenkins-和-github)
-  - [实现自动触发打包](#实现自动触发打包)
 - [常见问题](#常见问题)
 
-## 项目分层架构
+## 分层架构
 
 [react-clean-architecture](https://github.com/eduardomoroni/react-clean-architecture)
 
@@ -56,7 +44,7 @@
 
 目前前端开发主要是以单页应用为主，当应用的业务逻辑足够复杂的时候，总会遇到类似下面的问题：
 
-- 业务逻辑过于集中在视图层，导致多平台无法共用本应该与平台无关的业务逻辑，例如一个产品需要维护 mobile 和 PC 两端，或者同一个产品有 web 和 react native 两端；
+- 业务逻辑过于集中在视图层，导致多平台无法共用本应该与平台无关的业务逻辑，例如一个产品需要维护 Mobile 和 PC 两端，或者同一个产品有 Web 和 React Native 两端；
 
 - 产品需要多人协作时，每个人的代码风格和对业务的理解不同，导致业务逻辑分布杂乱无章；
 
@@ -66,7 +54,7 @@
 
 针对上面所遇到的问题，笔者学习了一些关于 DDD（领域驱动设计）、Clean Architecture 等知识，并收集了类似思想在前端方面的实践资料，形成了下面这种前端分层架构：
 
-<img src="./assets/architecture.png" width=600/>
+<img src="https://i.loli.net/2020/02/29/5RhfH3BYMb9wIOs.png" width=600/>
 
 其中 View 层想必大家都很了解，就不在这里介绍了，重点介绍下下面三个层的含义：
 
@@ -74,9 +62,9 @@
 
 Services 层是用来对底层技术进行操作的，例如封装 AJAX 请求,操作浏览器 cookie、locaStorage、indexDB，操作 native 提供的能力（如调用摄像头等），以及建立 Websocket 与后端进行交互等。
 
-其中又可细分出来一个 translator 层，主要是对后端提供的接口进行数据的转换修正，例如接口返回的数据命名不规范或格式有问题等等，一般以纯函数形式存在。下面以本项目实际代码为例进行讲解。
+其中 Services 层又可细分出 request 层和 translator 层， request 层主要是实现 Services 的大部分功能。而 translator 层主要用于清洗从服务端或客户端接口返回的数据：删除部分数据、修改属性名、转化部分数据等，一般可定义成纯函数形式。下面以本项目实际代码为例进行讲解。
 
-向后端获取 quote 数据:
+从后端获取 quote 数据:
 
 ```ts
 export class CommonService implements ICommonService {
@@ -95,12 +83,12 @@ export class CommonService implements ICommonService {
 }
 ```
 
-向客户端日历中同步任务数据:
+向客户端日历中同步 Note 数据:
 
 ```ts
 export class NativeService implements INativeService {
   // 同步到日历
-  @p()
+  @limit(['android', 'ios'], '1.0.1')
   public syncCalendar(params: SyncCalendarParams, onSuccess: () => void): void {
     const cb = async (errCode: number) => {
       const msg = NATIVE_ERROR_CODE_MAP[errCode];
@@ -120,24 +108,31 @@ export class NativeService implements INativeService {
 }
 ```
 
-向 indexDB 存储任务数据：
+从 indexDB 读取某个 Note 详情数据：
 
 ```ts
+import { noteTranslator } from './translators';
+
 export class NoteService implements INoteService {
-  public async create(payload: INote, notebookId: number): Promise<void> {
+  public async get(id: number): Promise<INotebook | undefined> {
     const db = await createDB();
 
-    const notebook = await db.getFromIndex('notebooks', 'id', notebookId);
-    if (notebook) {
-      notebook.notes.push(payload);
-      await db.put('notebooks', notebook);
-    }
+    const notebook = await db.getFromIndex('notebooks', 'id', id);
+    return noteTranslator(notebook!);
   }
-  ...
 }
 ```
 
-这里我们可以拓宽下思路，当后端 API 仍在开发的时候，我们可以使用 indexDB 等本地存储技术进行模拟，建立一个 note-indexDB 服务，先提供给上层 Interactors 层进行调用，当后端 API 开发好后，就可以创建一个 note-server 服务，来替换之前的服务。只要保证前后两个服务对外暴露的接口一致，另外与上层的 Interactors 层没有过度耦合，即可实现快速切换。
+其中，noteTranslator 就属于 translator 层，用于订正接口返回的 note 数据，定义如下：
+
+```ts
+export function noteTranslator(item: INotebook) {
+  // item.themeColor = item.color;
+  return item;
+}
+```
+
+另外我们可以拓宽下思路，当后端 API 仍在开发的时候，我们可以使用 indexDB 等本地存储技术进行模拟，建立一个 note-indexDB 服务，先提供给上层 Interactors 层进行调用，当后端 API 开发好后，就可以创建一个 note-server 服务，来替换之前的服务。只要保证前后两个服务对外暴露的接口一致，另外与上层的 Interactors 层没有过度耦合，即可实现快速切换。
 
 ### Entities 层
 
@@ -171,36 +166,72 @@ export default class Note {
 }
 ```
 
-通过上面的代码可以看到，这里主要是以实体本身的属性以及派生属性为主，当然实体本身也可以具有方法，只是本项目中还没有涉及。至于 DDD 中的聚合等概念，也由于项目业务没有涉及，在这里就不作说明了，有兴趣的可以参考下面列出来的笔者翻译的文章：[可扩展的前端#2--常见模式（译）](https://juejin.im/post/5d8ac00cf265da5b6a16844a)。
+通过上面的代码可以看到，这里主要是以实体本身的属性以及派生属性为主，当然实体本身也可以具有方法，用于实现属于实体自身的业务逻辑（笔者认为业务逻辑可以分为两部分，一部分业务逻辑属于跟实体强相关的，应该通过在实体类中的方法实现。另一部分业务逻辑则更多的是实体之间的业务，则可以放在 Interactors 层中实现）。只是本项目中还没有涉及，在这里就不作更多说明了，有兴趣的可以参考下面列出来的笔者翻译的文章：[可扩展的前端#2--常见模式（译）](https://juejin.im/post/5d8ac00cf265da5b6a16844a)。
 
-另外笔者认为并不是所有的实体都应该按上面那样封装成一个类，如果某个实体本身业务逻辑很简单，就没有必要进行封装，例如本项目中 Notebook 实体就没有做任何封装，而是直接在 Interactors 层调用 Services 层提供的 API。
+另外笔者认为并不是所有的实体都应该按上面那样封装成一个类，如果某个实体本身业务逻辑很简单，就没有必要进行封装，例如本项目中 Notebook 实体就没有做任何封装，而是直接在 Interactors 层调用 Services 层提供的 API。毕竟我们做这些分层最终的目的就是理顺业务逻辑，提升开发效率，所以没有必要过于死板。
 
 ### Interactors 层
 
-Interactors 层是负责处理业务逻辑的层，主要是由业务用例组成。下面是本项目中 Note 的 Interactors 层提供的对 Note 的增删改查以及同步到日历等业务：
+Interactors 层是负责处理业务逻辑的层，主要是由业务用例组成。一般情况下 Interactor 是一个单例，它使我们能够存储一些状态并避免不必要的 HTTP 调用，提供一种重置应用程序状态属性的方法（例如：在失去修改记录时恢复数据），决定什么时候应该加载新的数据。
+
+下面是本项目中 Common 的 Interactors 层提供的公共调用的业务：
 
 ```ts
-class NoteInteractor {
-  constructor(
-    private noteService: INoteService,
-    private nativeService: INativeService
-  ) {}
+class CommonInteractor {
+  public static getInstance() {
+    return this._instance;
+  }
 
-  public async saveNote(payload: INote, notebookId: number, isEdit: boolean) {
+  private static _instance = new CommonInteractor(new CommonService());
+
+  private _quotes: any;
+
+  constructor(private _service: ICommonService) {}
+
+  public async getQuoteList() {
+    // 单例模式下，将一些基本固定不变的接口数据保存在内存中，避免重复调用
+    // 但要注意避免内存泄露
+    if (this._quotes !== undefined) {
+      return this._quotes;
+    }
+
+    let response;
+
     try {
-      if (isEdit) {
-        await this.noteService.edit(payload, notebookId);
-      } else {
-        await this.noteService.create(payload, notebookId);
-      }
+      response = await this._service.getQuoteList();
     } catch (error) {
       throw error;
     }
+
+    this._quotes = response;
+    return this._quotes;
   }
+}
+```
+
+通过上面的代码可以看到，Sevices 层提供的类的实例主要是通过 Interactors 层的类的构造函数获取到，这样就可以达到两层之间解耦，实现快速切换 service 的目的了，当然这个和依赖注入 DI 还是有些差距的，不过已经满足了我们的需求。
+
+另外 Interactors 层还可以获取 Entities 层提供的实体类，将实体类提供的与实体强相关的业务逻辑和 Interactors 层的业务逻辑融合到一起提供给 View 层，例如 Note 的 Interactors 层部分代码如下：
+
+```ts
+class NoteInteractor {
+  public static getInstance() {
+    return this._instance;
+  }
+
+  private static _instance = new NoteInteractor(
+    new NoteService(),
+    new NativeService()
+  );
+
+  constructor(
+    private _service: INoteService,
+    private _service2: INativeService
+  ) {}
 
   public async getNote(notebookId: number, id: number) {
     try {
-      const note = await this.noteService.get(notebookId, id);
+      const note = await this._service.get(notebookId, id);
       if (note) {
         return new Note(note);
       }
@@ -208,39 +239,8 @@ class NoteInteractor {
       throw error;
     }
   }
-
-  ...
-
-  public async changeSyncStatus(
-    notebookId: number,
-    id: number,
-    status: boolean
-  ) {
-    try {
-      const note = await this.getNote(notebookId, id);
-      if (note) {
-        note.isSync = status;
-        await this.saveNote(note, notebookId, true);
-      }
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  public async syncCalendar(params: SyncCalendarParams, notebookId: number) {
-    const noteId = params.id;
-    try {
-      await this.nativeService.syncCalendar(params, async () => {
-        await this.changeSyncStatus(notebookId, noteId, true);
-      });
-    } catch (error) {
-      throw error;
-    }
-  }
 }
 ```
-
-通过上面的代码可以看到，Sevices 层提供的类的实例主要是通过 Interactors 层的类的构造函数获取到，这样就可以达到两层之间解耦，实现快速切换 service 的目的了，当然这个和依赖注入 DI 还是有些差距的，不过已经满足了我们的需求。另外，Interactors 层还可以获取 Entities 层提供的类，构造成实例提供给 View 层。
 
 当然这种分层架构并不是银弹，其主要适用的场景是：实体关系复杂，而交互相对模式化，例如企业软件领域。相反实体关系简单而交互复杂多变就不适合这种分层架构了。
 
@@ -272,25 +272,388 @@ class NoteInteractor {
 
 [领域驱动设计在前端中的应用](https://juejin.im/post/5d3926176fb9a07ef161c719)
 
-## 组件库
+## 微前端
 
-[vant](https://youzan.github.io/vant/#/zh-CN/intro)
+[preload-routes](https://github.com/micro-frontends-vue/preload-routes)
 
-[vux](https://github.com/airyland/vux)
+[async-routes](https://github.com/micro-frontends-vue/async-routes)
 
-[mint-ui](https://github.com/ElemeFE/mint-ui)
+### 背景介绍
 
-[cube-ui](https://github.com/didi/cube-ui)
+对于大型前端项目，比如公司内部管理系统（一般包括 OA、HR、CRM、会议预约等系统），如果将所有业务放在一个前端项目里，随着业务功能不断增加，就会导致如下这些问题：
 
-Vue 移动端组件库目前主要就是上面罗列的这几个库，本项目使用的是有赞前端团队开源的 vant。
+- 代码规模庞大，导致编译时间过长，开发、打包速度越来越慢
 
-vant 官方目前已经支持自定义样式主题，基本原理就是在 [less-loader](https://github.com/webpack-contrib/less-loader) 编译 [less](http://lesscss.org/) 文件到 css 文件过程中，利用 less 提供的 [modifyVars](http://lesscss.org/usage/#using-less-in-the-browser-modify-variables) 对 less 变量进行修改，本项目也采用了该方式，具体配置请查看相关文档：
+- 项目文件越来越多，导致查找相关文件变得越来越困难
 
-[定制主题](https://youzan.github.io/vant/#/zh-CN/theme)
+- 某一个业务的小改动，导致整个项目的打包和部署
 
-推荐一篇介绍各个组件库特点的文章：
+### 方案介绍
 
-[Vue 常用组件库的比较分析（移动端）](https://blog.csdn.net/weixin_38633659/article/details/89736656)
+preload-routes 和 async-routes 是目前笔者所在团队使用的微前端方案，最终会将整个前端项目拆解成一个主项目和多个子项目，其中两者作用如下：
+
+- 主项目：用于管理子项目的路由切换、注册子项目的路由和全局 Store 层、提供全局库和方法
+
+- 子项目：用于开发子业务线业务代码，一个子项目对应一个子业务线，并且包含两端（PC + Mobile）代码和复用层代码（项目分层中的非视图层）
+
+结合之前的分层架构实现复用非视图代码的方式，完整的方案如下：
+
+<img src="https://i.loli.net/2020/02/29/Jyf3wAdbVkm5NGc.png" width=600>
+
+如图所示，将整个前端项目按照业务线拆分出多个子项目，每个子项目都是独立的仓库，只包含了单个业务线的代码，可以进行独立开发和部署，降低了项目维护的复杂度。
+
+采用这套方案，使得我们的前端项目不仅保有了横向上（多个子项目）的扩展性，又拥有了纵向上（单个子项目）的复用性。那么这套方案具体是怎么实现的呢？下面就详细说明方案的实现机制。
+
+在讲解之前，首先明确下这套方案有两种实现方式，一种是预加载路由，另一种是懒加载路由，接下来就分别介绍这两种方式的实现机制。
+
+### 实现机制
+
+#### 预加载路由
+
+[preload-routes](https://github.com/micro-frontends-vue/preload-routes)
+
+1.子项目**按照 vue-cli 3 的 library 模式进行打包**，以便后续主项目引用
+
+注：在 library 模式中，Vue 是外置的。这意味着包中不会有 Vue，即便你在代码中导入了 Vue。如果这个库会通过一个打包器使用，它将尝试通过打包器以依赖的方式加载 Vue；否则就会回退到一个全局的 Vue 变量。
+
+2.在编译主项目的时候，**通过 InsertScriptPlugin 插件将子项目的入口文件 main.js 以 script 标签形式插入到主项目的 html 中**
+
+注：务必将子项目的入口文件 main.js 对应的 script 标签放在主项目入口文件 app.js 的 script 标签之上，这是为了确保子项目的入口文件先于主项目的入口文件代码执行，接下来的步骤就会明白为什么这么做。
+
+再注：本地开发环境下项目的入口文件编译后的 main.js 是保存在内存中的，所以磁盘上看不见，但是可以访问。
+
+InsertScriptPlugin 核心代码如下：
+
+```js
+compiler.hooks.compilation.tap('InsertScriptWebpackPlugin', (compilation) => {
+  compilation.hooks.htmlWebpackPluginBeforeHtmlProcessing.tap(
+    'InsertScriptWebpackPlugin',
+    (htmlPluginData) => {
+      const {
+        assets: { js }
+      } = htmlPluginData;
+      // 将传入的 js 以 script 标签形式插入到 html 中
+      // 注意：需要将子项目的入口文件 main.js 放在主项目入口文件 app.js 之前，因为需要子项目提前将自己的 route list 注册到全局上
+      js.unshift(...self.files);
+    }
+  );
+});
+```
+
+3.主项目的 html 要访问子项目里的编译后的 js / css 等资源，需要进行**代理转发**
+
+如果是本地开发时，可以通过 webpack 提供的 proxy，例如：
+
+```js
+const PROXY = {
+  '/app-a/': {
+    target: 'http://localhost:10241/'
+  }
+};
+```
+
+如果是线上部署时，可以通过 nginx 转发或者将打包后的主项目和子项目放在一个文件夹中按照相对路径引用。
+
+4.当浏览器解析 html 时，解析并执行到子项目的入口文件 main.js，**将子项目的 route list 注册到 Vue.\_\_share\_\_.routes 上**，以便后续主项目将其合并到总的路由中。
+
+子项目 main.js 代码如下：（为了尽量减少首次主项目页面渲染时加载的资源，子项目的入口文件建议只做路由挂载）
+
+```js
+import Vue from 'vue';
+import routes from './routes';
+
+const share = (Vue.__share__ = Vue.__share__ || {});
+const routesPool = (share.routes = share.routes || {});
+
+// 将子项目的 route list 挂载到 Vue.__share__.routes 上，以便后续主项目将其合并到总的路由中
+routesPool[process.env.VUE_APP_NAME] = routes;
+```
+
+5.继续向下解析 html，解析并执行到主项目 main.js 时，**从 Vue.\_\_share\_\_.routes 获取所有子项目的 route list，合并到总的路由表中**，然后初始化一个 vue-router 实例，并传入到 new Vue 内
+
+相关关键代码如下
+
+```js
+// 从 Vue.__share__.routes 获取所有子项目的 route list，合并到总的路由表中
+const routes = Vue.__share__.routes;
+
+export default new Router({
+  routes: Object.values(routes).reduce((acc, prev) => acc.concat(prev), [
+    {
+      path: '/',
+      redirect: '/app-a'
+    }
+  ])
+});
+```
+
+到此就实现了单页面应用按照业务拆分成多个子项目，直白来说子项目的入口文件 main.js 就是将主项目和子项目联系起来的桥梁。
+
+另外如果需要使用 vuex，则和 vue-router 的顺序恰好相反（先主项目后子项目）：
+
+1.首先在主项目的入口文件中初始化一个 store 实例 new Vuex.Store，然后挂在到 Vue.\_\_share\_\_.store 上
+
+2.然后在子项目的 App.vue 中获取到 Vue.\_\_share\_\_.store 并调用 store.registerModule(‘app-x', store)，将子项目的 store 作为子模块注册到 store 上
+
+#### 懒加载路由
+
+[async-routes](https://github.com/micro-frontends-vue/async-routes)
+
+懒加载路由，顾名思义，就是说等到用户点击要进入子项目模块，通过解析即将跳转的路由确定是哪一个子项目，然后再异步去加载该子项目的入口文件 main.js（可以通过 [systemjs](https://github.com/systemjs/systemjs) 或者自己写一个动态创建 script 标签并插入 body 的方法）。加载成功后就可以将子项目的路由动态添加到主项目总的路由里了。
+
+1.主项目 router.js 文件中定义了**在 vue-router 的 beforeEach 钩子去拦截路由，并根据即将跳转的路由分析出需要哪个子项目，然后去异步加载对应子项目入口文件**，下面是核心代码：
+
+```js
+const cachedModules = new Set();
+
+router.beforeEach(async (to, from, next) => {
+  const [, module] = to.path.split('/');
+
+  if (Reflect.has(modules, module)) {
+    // 如果已经加载过对应子项目，则无需重复加载，直接跳转即可
+    if (!cachedModules.has(module)) {
+      const { default: application } = await window.System.import(
+        modules[module]
+      );
+
+      if (application && application.routes) {
+        // 动态添加子项目的 route-list
+        router.addRoutes(application.routes);
+      }
+
+      cachedModules.add(module);
+      next(to.path);
+    } else {
+      next();
+    }
+    return;
+  }
+});
+```
+
+2.子项目的入口文件 main.js 仅需要**将子项目的 routes 暴露给主项目**即可，代码如下：
+
+```js
+import routes from './routes';
+
+export default {
+  name: 'javascript',
+  routes,
+  beforeEach(from, to, next) {
+    console.log('javascript:', from.path, to.path);
+    next();
+  }
+};
+```
+
+注意：这里除了暴露 routes 方法外，另外又暴露了 beforeEach 方法，其实就是为了支持通过路由守卫对子项目进行页面权限限制，主项目拿到这个子项目的 beforeEach，可以在 vue-router 的 beforeEach 钩子执行，具体代码请参考 async-routes。
+
+除了主项目和子项目的交互方式不同，代理转发子项目资源、vuex store 注册等和上面的预加载路由完全一致。
+
+### 优缺点
+
+下面谈下这套方案的优缺点：
+
+**优点**
+
+- 子项目可单独打包、单独部署上线，提升了开发和打包的速度
+
+- 子项目之间开发互相独立，互不影响，可在不同仓库进行维护，减少的单个项目的规模
+
+- 保持单页应用的体验，子项目之间切换不刷新
+
+- 改造成本低，对现有项目侵入度较低，业务线迁移成本也较低
+
+- 保证整体项目统一一个技术栈
+
+**缺点**：
+
+- 主项目和子项目需要共用一个 Vue 实例，所以无法做到某个子项目单独使用最新版 Vue（例如 Vue3）或者 React
+
+### 部分问题解答
+
+**1.如果子项目代码更新后，除了打包部署子项目之外，还需要打包部署主项目吗？**
+
+不需要更新部署主项目。这里有个 trick 上文忘记提及，就是子项目打包后的入口文件并没有加上 chunkhash，直接就是 main.js（子项目其他的 js 都有 chunkhash）。也就是说主项目只需要记住子项目的名字，就可以通过 subapp-name/main.js 找到子项目的入口文件，所以子项目打包部署后，主项目并不需要更新任何东西。
+
+**2.针对第二个问题中子项目入口文件 main.js 不使用 chunkhash 的话，如何防止该文件始终被缓存呢？**
+
+可以在静态资源服务器端针对子项目入口文件设置强制缓存为不缓存，下面是服务器为 nginx 情况的相关配置：
+
+```bash
+location / {
+    set $expires_time 7d;
+    ...
+    if ($request_uri ~* \/(contract|meeting|crm)-app\/main.js(\?.*)?$) {
+        # 针对入口文件设置 expires_time -1，即expire是服务器时间的 -1s，始终过期
+        set $expires_time -1;
+    }
+    expires $expires_time;
+    ...
+}
+```
+
+### 待完善
+
+- 可以通过写一个脚手架来自动生成子项目以及相关的配置
+
+### 结尾
+
+如果没有在一个大型前端项目中使用多个技术栈的需求，还是很推荐笔者目前团队实践的这个方案的。另外如果是 React 技术栈，也是可以按照这种思想去实现类似的方案的。
+
+## 离线包
+
+[mobile-web-best-practice-container](https://github.com/mcuking/mobile-web-best-practice-container)
+
+[offline-package-admin](https://github.com/mcuking/offline-package-admin)
+
+[offline-package-webpack-plugin](https://github.com/mcuking/offline-package-webpack-plugin)
+
+离线包技术可以将网页的网络加载时间变为 0，极大提升应用的用户体验。原理如下图所示：
+
+<img src="https://i.loli.net/2020/02/29/KdDCoHhMUj3TmvN.png" width=600/>
+
+我们可以先将页面需要的静态资源打包并预先加载到客户端的安装包中，当用户安装时，再将资源解压到本地存储中，当 WebView 加载某个 H5 页面时，拦截发出的所有 http 请求，查看请求的资源是否在本地存在，如果存在则直接返回资源。
+
+### 前端部分
+
+相关代码：
+
+**离线包打包插件**：https://github.com/mcuking/offline-package-webpack-plugin
+
+**应用插件的前端项目**：https://github.com/mcuking/mobile-web-best-practice
+
+首先需要在前端打包的过程中同时生成离线包，我的思路是 webpack 插件在 emit 钩子时（生成资源并输出到目录之前），通过 compilation 对象（代表了一次单一的版本构建和生成资源）遍历读取 webpack 打包生成的资源，然后将每个资源（可通过文件类型限定遍历范围）的信息记录在一个资源映射的 json 里，具体内容如下：
+
+资源映射 json 示例
+
+```
+{
+  "packageId": "mwbp",
+  "version": 1,
+  "items": [
+    {
+      "packageId": "mwbp",
+      "version": 1,
+      "remoteUrl": "http://122.51.132.117/js/app.67073d65.js",
+      "path": "js/app.67073d65.js",
+      "mimeType": "application/javascript"
+    },
+    ...
+  ]
+}
+```
+
+其中 remoteUrl 是该资源在静态资源服务器的地址，path 则是在客户端本地的相对路径（通过拦截该资源对应的服务端请求，并根据相对路径从本地命中相关资源然后返回）。
+
+最后将该资源映射的 json 文件和需要本地化的静态资源打包成 zip 包，以供后面的流程使用。
+
+### 离线包管理平台
+
+相关代码：
+
+**离线包管理平台前后端**：https://github.com/mcuking/offline-package-admin
+
+**文件差分工具**：https://github.com/Exoway/bsdiff-nodejs
+
+从上面有关离线包的阐述中，有心者不难看出其中有个遗漏的问题，那就是当前端的静态资源更新后，客户端中的离线包资源如何更新？难不成要重新发一个安装包吗？那岂不是摒弃了 H5 动态化的特点了么？
+
+而离线包平台就是为了解决这个问题。下面我以 [mobile-web-best-practice](https://github.com/mcuking/mobile-web-best-practice) 这个前端项目为例讲解整个过程：
+
+[mobile-web-best-practice](https://github.com/mcuking/mobile-web-best-practice) 项目对应的离线包名为 main，第一个版本可以如上文所述先预置到客户端安装包里，同时将该离线包上传到离线包管理平台中，该平台除了保存离线包文件和相关信息之外，还会生成一个名为 packageIndex 的 json 文件，即记录所有相关离线包信息集合的文件，该文件主要是提供给客户端下载的。大致内容如下：
+
+```
+{
+  "data": [
+    {
+      "module_name": "main",
+      "version": 2,
+      "status": 1,
+      "origin_file_path": "/download/main/07eb239072934103ca64a9692fb20f83",
+      "origin_file_md5": "ec624b2395a479020d02262eee36efe4",
+      "patch_file_path": "/download/main/b4b8e0616e75c0cc6f34efde20fb6f36",
+      "patch_file_md5": "6863cdacc8ed9550e8011d2b6fffdaba"
+    }
+  ],
+  "errorCode": 0
+}
+```
+
+其中 data 中就是所有相关离线包的信息集合，包括了离线包的版本、状态、以及文件的 url 地址和 md5 值等。
+
+当 [mobile-web-best-practice](https://github.com/mcuking/mobile-web-best-practice) 更新后，会通过 [offline-package-webpack-plugin](https://github.com/mcuking/offline-package-webpack-plugin) 插件打包出一个新的离线包。这个时候我们就可以将这个离线包上传到管理平台，此时 packageIndex 中离线包 main 的版本就会更新成 2。
+
+当客户端启动并请求最新的 packageIndex 文件时，发现离线包 main 的版本比本地对应离线包的版本大时，会从离线包平台下载最新的版本，并以此作为查询本地静态资源文件的资源池。
+
+讲到这里读者可能还会有一个疑问，那就是如果前端仅仅是改动了某一处，客户端仍旧需要下载完整的新包，岂不是很浪费流量同时也延长了文件下载的时间？
+
+针对这个问题我们可以使用一个文件差分工具 - [bsdiff-nodejs](https://github.com/Exoway/bsdiff-nodejs)，该 node 工具调用了 c 语言实现的 bsdiff 算法（基于二进制进行文件比对算出 diff/patch 包）。当上传版本为 2 的离线包到管理平台时，平台会与之前保存的版本为 1 的离线包进行 diff ，算出 1 到 2 的差分包。而客户端仅仅需要下载差分包，然后同样使用基于 bsdiff 算法的工具，和本地版本 1 的离线包进行 patch 生成版本 2 的离线包。
+
+到此离线包管理平台大致原理就讲完了，但仍有待完善的地方，例如：
+
+1. 增加日志功能
+
+2. 增加离线包达到率的统计功能
+
+...
+
+### 客户端
+
+相关项目：
+
+**集成离线包库的安卓项目**：https://github.com/mcuking/mobile-web-best-practice-container
+
+客户端的离线包库目前仅开发了 android 平台，该库是在
+[webpackagekit](https://github.com/yangjianjun198/webpackagekit)（个人开发的安卓离线包库）基础上进行的二次开发，主要实现了一个多版本文件资源管理器，可以支持多个前端离线包预置到客户端中。其中拦截请求的源码如下：
+
+```java
+public class OfflineWebViewClient extends WebViewClient {
+    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
+    @Override
+    public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+        final String url = request.getUrl().toString();
+        WebResourceResponse resourceResponse = getWebResourceResponse(url);
+        if (resourceResponse == null) {
+            return super.shouldInterceptRequest(view, request);
+        }
+        return resourceResponse;
+    }
+
+    /**
+     * 从本地命中并返回资源
+     * @param url 资源地址
+     */
+    private WebResourceResponse getWebResourceResponse(String url) {
+        try {
+            WebResourceResponse resourceResponse = PackageManager.getInstance().getResource(url);
+            return resourceResponse;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+}
+```
+
+通过对 WebviewClient 类的 shouldInterceptRequest 方法的复写来拦截 http 请求，并从本地查找是否有相应的前端静态资源，如果有则直接返回。
+
+### 部分问题解答
+
+#### 1. 离线包是否可以自动更新？
+
+当前端资源通过 CI 机自动打包后部署到静态资源服务器，那么又如何上传到离线包平台呢？我曾经考虑过当前端资源打包好时，通过接口自动上传到离线包平台。但后来发现可行性不高，因为我们的前端资源是需要经过测试阶段后，通过运维手动修改 docker 版本来更新前端资源。如果自动上传，则会出现离线包平台已经上传了了未经验证的前端资源，而静态资源服务器却没有更新的情况。因此仍需要手动上传离线包。当然读者可以根据实际情况选择合适的上传方式。
+
+#### 2. 多 App 情况下如何区分离线包属于哪个 App？
+
+在上传的离线包填写信息的时候，增加了 appName 字段。当请求离线包列表 json 文件时，在 query 中添加 appName 字段，离线包平台会只返回属于该 App 的离线包列表。
+
+#### 3. 一定要在 App 启动的时候下载离线包吗？
+
+当然可以做的更丰富些，比如可以选择在客户端连接到 Wi-Fi 的时候，或者从后台切换到前台并超过 10 分钟时候。该设置项可以放在离线包平台中进行配置，可以做成全局有效的设置或者针对不同的离线包进行个性化设置。
+
+#### 4. 如果客户端离线包还没有下载完成，而静态资源服务器已经部署了最新的版本，那么是否会出现客户端展示的页面仍然是旧的版本呢？如果这次改动的是接口请求的变动，那岂不是还会引起接口报错？
+
+这个大可不必担心，上面的代码中如果 http 请求没有命中任何前端资源，则会放过该请求，让它去请求远端的服务器。因此即使本地离线包资源没有及时更新，仍然可以保证页面的静态资源是最新的。也就是说有一个兜底的方案，出了问题大不了回到原来的请求服务器的加载模式。
 
 ## JSBridge
 
@@ -340,17 +703,20 @@ h5 端同步日历核心代码（通过装饰器来限制调用接口的平台�
 ```ts
 class NativeMethods {
   // 同步到日历
-  @p()
-  public syncCalendar(params: SyncCalendarParams) {
-    const cb = (errCode: number) => {
+  @limit(['android', 'ios'], '1.0.1')
+  public syncCalendar(params: SyncCalendarParams, onSuccess: () => void): void {
+    const cb = async (errCode: number) => {
       const msg = NATIVE_ERROR_CODE_MAP[errCode];
 
       Vue.prototype.$toast(msg);
 
       if (errCode !== 6000) {
         this.errorReport(msg, 'syncCalendar', params);
+      } else {
+        await onSuccess();
       }
     };
+
     dsbridge.call('syncCalendar', params, cb);
   }
 
@@ -391,26 +757,244 @@ function p(platforms = ['android', 'ios']) {
 
 [JSBridge 实现原理](https://github.com/mcuking/JSBridge)
 
-## 路由堆栈管理（模拟原生 APP 导航）
+## 异常监控
 
-[vue-page-stack](https://github.com/hezhongfeng/vue-page-stack)
+[sentry](https://github.com/getsentry/sentry)
 
-[vue-navigation](https://github.com/zack24q/vue-navigation)
+移动端网页相对 PC 端，主要有设备众多，网络条件各异，调试困难等特点。导致如下问题：
 
-[vue-stack-router](https://github.com/luojilab/vue-stack-router)
+- 设备兼容或网络异常导致只有部分情况下才出现的 bug，测试无法全面覆盖
 
-在使用 h5 开发 app，会经常遇到下面的需求：
-从列表进入详情页，返回后能够记住当前位置，或者从表单点击某项进入到其他页面选择，然后回到表单页，需要记住之前表单填写的数据。可是目前 vue 或 react 框架的路由，均不支持同时存在两个页面实例，所以需要路由堆栈进行管理。
+- 无法获取出现 bug 的用户的设备，又不能复现反馈的 bug
 
-其中 vue-page-stack 和 vue-navigation 均受 vue 的 keepalive 启发，基于 [vue-router](https://router.vuejs.org/)，当进入某个页面时，会查看当前页面是否有缓存，有缓存的话就取出缓存，并且清除排在他后面的所有 vnode，没有缓存就是新的页面，需要存储或者是 replace 当前页面，向栈里面 push 对应的 vnode，从而实现记住页面状态的功能。
+- 部分 bug 只出现几次，后面无法复现，不能还原事故现场
 
-而逻辑思维前端团队的 vue-stack-router 则另辟蹊径，抛开了 vue-router，自己独立实现了路由管理，相较于 vue-router，主要是支持同时可以存活 A 和 B 两个页面的实例，或者 A 页面不同状态的两个实例，并支持原生左滑功能。但由于项目还在初期完善，功能还没有 vue-router 强大，建议持续关注后续动态再做决定是否引入。
+这时就非常需要一个异常监控平台，将异常实时上传到平台，并及时通知相关人员。
 
-本项目使用的是 vue-page-stack，各位可以选择适合自己项目的工具。同时推荐几篇相关文章：
+相关工具有 sentry，fundebug 等，其中 sentry 因为功能强大，支持多平台监控（不仅可以监控前端项目），完全开源，可以私有化部署等特点，而被广泛采纳。
 
-[【vue-page-stack】Vue 单页应用导航管理器 正式发布](https://juejin.im/post/5d2ef417f265da1b971aa94f)
+下面是 sentry 在本项目应用时使用的相关配套工具。
 
-[Vue 社区的路由解决方案：vue-stack-router](https://juejin.im/post/5d4ce4fd6fb9a06acd450e8c)
+**sentry 针对 javascript 的 sdk**
+
+[sentry-javascript](https://github.com/getsentry/sentry-javascript)
+
+**自动上传 sourcemap 的 webpack 插件**
+
+[sentry-webpack-plugin](https://github.com/getsentry/sentry-webpack-plugin)
+
+**编译时自动在 try catch 中添加错误上报函数的 babel 插件**
+
+[babel-plugin-try-catch-error-report](https://github.com/mcuking/babel-plugin-try-catch-error-report)
+
+**补充：**
+
+前端的异常主要有以下几个部分：
+
+- 静态资源加载异常
+
+- 接口异常（包括与后端和 native 的接口）
+
+- js 报错
+
+- 网页崩溃
+
+### 静态资源加载异常
+
+静态资源加载失败，可以通过 window.addEventListener('error', ..., true) 在事件捕获阶段获取，然后筛选出资源加载失败的错误并手动上报错误。核心代码如下：
+
+```ts
+// 全局监控资源加载错误
+window.addEventListener(
+  'error',
+  (event) => {
+    // 过滤 js error
+    const target = event.target || event.srcElement;
+    const isElementTarget =
+      target instanceof HTMLScriptElement ||
+      target instanceof HTMLLinkElement ||
+      target instanceof HTMLImageElement;
+    if (!isElementTarget) {
+      return false;
+    }
+    // 上报资源地址
+    const url =
+      (target as HTMLScriptElement | HTMLImageElement).src ||
+      (target as HTMLLinkElement).href;
+
+    this.log({
+      error: new Error(`ResourceLoadError: ${url}`),
+      type: 'resource load'
+    });
+  },
+  true
+);
+```
+
+### 接口异常
+
+接口异常，可以通过在封装的 http 模块中，全局集成上报错误函数（native 接口的错误上报类似，可在项目中查看）。核心代码如下：
+
+```ts
+function errorReport(
+  url: string,
+  error: string | Error,
+  requestOptions: AxiosRequestConfig,
+  response?: AnyObject
+) {
+  if (window.$sentry) {
+    const errorInfo: RequestErrorInfo = {
+      error: typeof error === 'string' ? new Error(error) : error,
+      type: 'request',
+      requestUrl: url,
+      requestOptions: JSON.stringify(requestOptions)
+    };
+
+    if (response) {
+      errorInfo.response = JSON.stringify(response);
+    }
+
+    window.$sentry.log(errorInfo);
+  }
+}
+```
+
+### js 报错
+
+关于全局 js 报错，sentry 针对的前端的 sdk 已经通过 window.onerror 和 window.addEventListener('unhandledrejection', ..., false) 进行全局监听并上报。
+
+需要注意的是其中 window.onerror = (message, source, lineno, colno, error) =>{} 不同于 window.addEventListener('error', ...)，window.onerror 捕获的信息更丰富，包括了错误字符串信息、发生错误的 js 文件，错误所在的行数、列数、和 Error 对象（其中还会有调用堆栈信息等）。所以 sentry 会选择 window.onerror 进行 js 全局监控。
+
+但有一种错误是 window.onerror 监听不到的，那就是 unhandledrejection 错误，这个错误是当 promise reject 后没有 catch 住所引起的。当然 sentry 的 sdk 也已经做了监听。
+
+针对 vue 项目，也可对 errorHandler 钩子进行全局监听，react 的话可以通过 componentDidCatch 钩子，vue 相关代码如下：
+
+```ts
+// 全局监控 Vue errorHandler
+Vue.config.errorHandler = (error, vm, info) => {
+  window.$sentry.log({
+    error,
+    type: 'vue errorHandler',
+    vm,
+    info
+  });
+};
+```
+
+#### try catch 中自动添加上报错误方法
+
+但是对于我们业务中，经常会对一些可能报错的代码使用 try catch，这些错误如果没有在 catch 中向上抛出，是无法通过 window.onerror 捕获的，针对这种情况，笔者开发了一个 babel 插件 [babel-plugin-try-catch-error-report](https://github.com/mcuking/babel-plugin-try-catch-error-report)，该插件可以在 [babel](https://babeljs.io/) 编译 js 的过程中，通过在 ast 中查找 catch 节点，然后再 catch 代码块中自动插入错误上报函数，可以自定义函数名，和上报的内容（源码所在文件，行数，列数，调用栈，以及当前 window 属性，比如当前路由信息 window.location.href）。相关配置代码如下：
+
+```js
+if (!IS_DEV) {
+  plugins.push([
+    'try-catch-error-report',
+    {
+      expression: 'window.$sentry.log',
+      needFilename: true,
+      needLineNo: true,
+      needColumnNo: false,
+      needContext: true,
+      exclude: ['node_modules']
+    }
+  ]);
+}
+```
+
+#### 捕获不同域 JS 报错
+
+针对跨域 js 问题，当加载的不同域的 js 文件时，例如通过 cdn 加载打包后的 js。如果 js 报错，window.onerror 只能捕获到 script error，没有任何有效信息能帮助我们定位问题。此时就需要我们做一些事情：
+首先服务端需要在返回 js 的返回头设置 Access-Control-Allow-Origin: \*
+然后设置 script 标签属性 crossorigin，代码如下：
+
+```html
+<script src="http://helloworld/main.js" crossorigin></script>
+```
+
+如果是动态添加的，也可动态设置：
+
+```js
+const script = document.createElement('script');
+script.crossOrigin = 'anonymous';
+script.src = url;
+document.body.appendChild(script);
+```
+
+### 网页崩溃
+
+针对网页崩溃问题，推荐一个基于 service work 的监控方案，相关文章已列在下面的。如果是 webview 加载网页，也可以通过 webview 加载失败的钩子监控网页崩溃等。
+
+[如何监控网页崩溃？](https://juejin.im/entry/5be158116fb9a049c6434f4a)
+
+### 上传 sourcemap 到 Sentry
+
+最后，因为部署到线上的代码一般都是经过压缩混淆的，如果没有上传 sourcemap 的话，是无法定位到具体源码的，可以现在 项目中添加 .sentryclirc 文件，其中内容可参考本项目的 .sentryclirc，然后通过 sentry-cli (需要全局全装 sentry-cli 即`npm install sentry-cli`)命令行工具进行上传，命令如下：
+
+```
+sentry-cli releases -o 机构名 -p 项目名 files 版本 upload-sourcemaps sourcemap 文件相对位置 --url-prefix js 在线上相对根目录的位置 --rewrite
+// 示例
+sentry-cli releases -o mcukingdom -p hello-world files 0.2.1 upload-sourcemaps dist/js --url-prefix '~/js/' --rewrite
+```
+
+当然官方也提供了 webpack 插件 [sentry-webpack-plugin](https://github.com/getsentry/sentry-webpack-plugin)，当打包时触发 webpack 的 after-emit 事件钩子（即生成资源到 output 目录之后），插件会自动上传打包目录中的 sourcemap 和关联的 js，相关配置可参考本项目的 vue.config.js 文件。
+
+通常为了安全，是不允许在线上部署 sourcemap 文件的，所以上传 sourcemap 到 sentry 后，可手动删除线上 sourcemap 文件。
+
+## 页面状态保持
+
+[router-view](https://router.vuejs.org/zh/guide/essentials/nested-routes.html#%E5%B5%8C%E5%A5%97%E8%B7%AF%E7%94%B1)
+
+[scrollBehavior](https://router.vuejs.org/zh/guide/advanced/scroll-behavior.html#%E6%BB%9A%E5%8A%A8%E8%A1%8C%E4%B8%BA)
+
+[scrollTop](https://developer.mozilla.org/zh-CN/docs/Web/API/Element/scrollTop)
+
+[keep-alive](https://cn.vuejs.org/v2/guide/components-dynamic-async.html#%E5%9C%A8%E5%8A%A8%E6%80%81%E7%BB%84%E4%BB%B6%E4%B8%8A%E4%BD%BF%E7%94%A8-keep-alive)
+
+场景描述：当从 A 页面进入 B 页面再返回时，A 页面滑动位置、条件选择、输入内容等状态均要保持。
+
+### keep-alive
+
+首先最先想到的可能是 vue 提供的 keep-alive，对页面实例进行缓存，返回时恢复实例即可（上面的 `页面导航管理` 部分前两个库也是基于 keep-alive 的）。如果遇到需求是：从 A 页面进入 B 页面不需要缓存 B，从 C 页面进入 B 页面需要缓存 B，那么可以将缓存的组件名保存在 vuex 上，然后在 vue-router 路由切换时，根据路由的 from 和 to 的不同来动态增删 vuex 上保存的需要缓存的组件名。具体做法可参考笔者之前写的文章 [keep-alive + vuex + vue-router 实现动态缓存 h5 页面](https://github.com/mcuking/blog/issues/41)。
+
+### scrollBehavior
+
+其次如果只考虑保持页面的滑动位置，可以将页面中需要记住位置的元素 scrollTop 值保存到 vuex  或 sessionStorage 中，key 可以是页面路由，或者再加上页面某个元素的标记，当返回该页面，则取出对应的 scrollTop 值，给整个页面或者其中部分元素重新设置上即可。
+
+不过这种手动记录和恢复的方式显得过于繁琐，而 vue-router 提供的 scrollBehavior 方法，则只需在全局配置一次，即可实现记住页面位置。具体代码如下：
+
+```js
+scrollBehavior (to, from, savedPosition) {
+  if (savedPosition) {
+    return savedPosition
+  } else {
+    return { x: 0, y: 0 }
+  }
+}
+```
+
+但是该方式的缺陷有两点：
+
+1. 需要限定 vue-router 为 history 模式
+
+2. 只能记住整体页面的位置（例如当列表仅仅是页面的一部分，则无法保持位置）
+
+另外如果还需要保持的表单数据等组件 data 中的值，也可以通过 mixin + sessionStorage/localStorage 来实现自动保存和恢复，具体做法可参考笔者之前写的文章 [react-hooks + vue mixin 实现 h5 表单数据自动存储](https://github.com/mcuking/blog/issues/42)
+
+### router-view
+
+上面提到的方式或多或少都有些缺陷，有没有更好的方式呢？
+
+当然有，最后推荐一种比较完美的方式：`<router-view>`，即路由嵌套。通俗点说就是可以在 A 页面上再覆盖 B 页面，在 B 页面再覆盖 C 页面，而被覆盖的页面并没有销毁，类似安卓原生开发中一个 activity 覆盖另一个 ativity，从而不需要记录和恢复上一个被销毁的页面状态了。
+
+这种方式的另一个好处是，多个页面在路由栈都是有记录的，当从 A 页面进入到 B 页面，然后触发系统返回事件时，会返回到 A 页面。相反如果使用弹出层 popup 来实现 B 页面在弹出层然后整体覆盖 A 页面，触发系统返回时，则会返回到 A 页面的上个页面，因为 B 页面在路由栈中并没有记录。
+
+`<router-view>` 方案原理如下：
+
+首先是在 A 页面模板中插入 `<router-view>` 标签，然后设置 B 页面为 A 页面的子路由；
+
+然后将 `<router-view>` 设置成 fixed 定位并覆盖整个屏幕，调高 z-index；
+
+当匹配到子路由的时候，会在 `<router-view>` 出渲染 B 页面，同时 A 页面不会销毁，而是被 B 页面完整覆盖。
 
 ## 请求数据缓存
 
@@ -418,9 +1002,7 @@ function p(platforms = ['android', 'ios']) {
 
 在我们的应用中，会存在一些很少改动的数据，而这些数据有需要从后端获取，比如公司人员、公司职位分类等，此类数据在很长一段时间时不会改变的，而每次打开页面或切换页面时，就重新向后端请求。为了能够减少不必要请求，加快页面渲染速度，可以引用 mem 缓存库。
 
-mem 基本原理是通过以接收的函数为 key 创建一个 WeakMap，然后再以函数参数为 key 创建一个 Map，value 就是函数的执行结果，同时将这个 Map 作为刚刚的 WeakMap 的 value 形成嵌套关系，从而实现对同一个函数不同参数进行缓存。而且支持传入 maxAge，即数据的有效期，当某个数据到达有效期后，会自动销毁，避免内存泄漏。
-
-选择 WeakMap 是因为其相对 Map 保持对键名所引用的对象是弱引用，即垃圾回收机制不将该引用考虑在内。只要所引用的对象的其他引用都被清除，垃圾回收机制就会释放该对象所占用的内存。也就是说，一旦不再需要，WeakMap 里面的键名对象和所对应的键值对会自动消失，不用手动删除引用。
+mem 基本原理是利用闭包将函数执行结果保存在内存中，当下一次调用这个函数时，首先从内存中的缓存对象中查找是否已经存在，如果没有再执行函数。同时支持传入 maxAge，即数据的有效期，当某个数据到达有效期后，会自动销毁，避免内存泄漏。
 
 mem 作为高阶函数，可以直接接受封装好的接口请求。但是为了更加直观简便，我们可以按照类的形式集成我们的接口函数，然后就可以用装饰器的方式使用 mem 了（装饰器只能修饰类和类的类的方法，因为普通函数会存在变量提升）。下面是相关代码：
 
@@ -456,149 +1038,81 @@ export class CommonService {
 }
 ```
 
-## Webpack 策略
+## 限制原生接口调用
 
-### 基础库抽离
+在平时开发中可能经常遇到类似情况：如果一个新功能需要 H5 调用 Native 提供的接口，部署上线后 H5 已经更新，但用户并没有更新客户端，就会导致调用接口无效的问题。那么如何解决这个问题呢？
 
-对于一些基础库，例如 vue、moment 等，属于不经常变化的静态依赖，一般需要抽离出来以提升每次构建的效率。目前主流方案有两种：
+### 获取客户端相关信息
 
-一种是使用 [webpack-dll-plugin](https://webpack.docschina.org/plugins/dll-plugin/) 插件，在首次构建时就讲这些静态依赖单独打包，后续只需引入早已打包好的静态依赖包即可；
+首先我们需要思考的是如何获取客户端的平台和版本号等信息，笔者推荐一种方式：Native 端修改 User Agent，向其中添加客户端的相关信息，而 H5 通过正则匹配到相关信息并挂在到全局上。下面是 H5 端的相关代码：
 
-另一种就是外部扩展 [Externals](https://webpack.docschina.org/configuration/externals/) 方式，即把不需要打包的静态资源从构建中剔除，使用 CDN 方式引入。下面是 webpack-dll-plugin 相对 Externals 的缺点：
-
-1. 需要配置在每次构建时都不参与编译的静态依赖，并在首次构建时为它们预编译出一份 JS 文件（后文将称其为 lib 文件），每次更新依赖需要手动进行维护，一旦增删依赖或者变更资源版本忘记更新，就会出现 Error 或者版本错误。
-
-2. 无法接入浏览器的新特性 script type="module"，对于某些依赖库提供的原生 ES Modules 的引入方式（比如 vue 的新版引入方式）无法得到支持，没法更好地适配高版本浏览器提供的优良特性以实现更好地性能优化。
-
-3. 将所有资源预编译成一份文件，并将这份文件显式注入项目构建的 HTML 模板中，这样的做法，在 HTTP1 时代是被推崇的，因为那样能减少资源的请求数量，但在 HTTP2 时代如果拆成多个 CDN Link，就能够更充分地利用 HTTP2 的多路复用特性。
-
-不过选择 Externals 还是需要一个靠谱的 CDN 服务的。
-
-本项目选择的是 Externals，各位可根据项目需求选择不同的方案。
-
-更多内容请查看这篇文章（上面观点来自于这篇文章）：
-
-[Webpack 优化——将你的构建效率提速翻倍](https://juejin.im/post/5d614dc96fb9a06ae3726b3e)
-
-## 离线化
-
-[mobile-web-best-practice-container](https://github.com/mcuking/mobile-web-best-practice-container)
-
-[offline-package-admin](https://github.com/mcuking/offline-package-admin)
-
-[offline-package-webpack-plugin](https://github.com/mcuking/offline-package-webpack-plugin)
-
-离线化技术可以将网页的网络加载时间变为 0，极大提升应用的用户体验。目前有以下几种实现方式：
-
-- Service Workers: 目前因无法在 iOS 大范围使用；
-
-- 实现一个类 Service Workers 的被动离线化技术，解决 iOS 不兼容问题；
-
-- 离线包技术，即将前端静态资源提前集成到客户端中。
-
-笔者选择了离线包技术，并计划在今年年底之前完成，因这个方案会涉及到前端、客户端以及后端，尤其是客户端工作量较大，所以会花费较长周期，届时会开源整个方案的所有代码，敬请期待。
-
-## 微前端
-
-[qiankun](https://github.com/umijs/qiankun)
-
-todo
-
-## 构建时预渲染
-
-针对目前单页面首屏渲染时间长（需要下载解析 js 文件然后渲染元素并挂载到 id 为 app 的 div 上），SEO 不友好（index.html 的 body 上实际元素只有 id 为 app 的 div 元素，真正的页面元素都是动态挂载的，搜索引擎的爬虫无法捕捉到），目前主流解决方案就是服务端渲染（SSR），即从服务端生成组装好的完整静态 html 发送到浏览器进行展示，但配置较为复杂，一般都会借助框架，比如 vue 的 [nuxt.js](https://github.com/nuxt/nuxt.js)，react 的 [next](https://github.com/zeit/next.js)。
-
-其实有一种更简便的方式--构建时预渲染。顾名思义，就是项目打包构建完成后，启动一个 Web Server 来运行整个网站，再开启多个无头浏览器（例如 [Puppeteer](https://github.com/GoogleChrome/puppeteer)、[Phantomjs](https://github.com/ariya/phantomjs) 等无头浏览器技术）去请求项目中所有的路由，当请求的网页渲染到第一个需要预渲染的页面时（需提前配置需要预渲染页面的路由），会主动抛出一个事件，该事件由无头浏览器截获，然后将此时的页面内容生成一个 HTML（包含了 JS 生成的 DOM 结构和 CSS 样式），保存到打包文件夹中。
-
-根据上面的描述，我们可以其实它本质上就只是快照页面，不适合过度依赖后端接口的动态页面，比较适合变化不频繁的静态页面。
-
-实际项目相关工具方面比较推荐 [prerender-spa-plugin](https://github.com/chrisvfritz/prerender-spa-plugin) 这个 webpack 插件，下面是这个插件的原理图。不过有两点需要注意：
-
-一个是这个插件需要依赖 Puppeteer，而因为国内网络原因以及本身体积较大，经常下载失败，不过可以通过 .npmrc 文件指定 Puppeteer 的下载路径为国内镜像；
-
-另一个是需要设置路由模式为 history 模式（即基于 html5 提供的 history api 实现的，react 叫 BrowserRouter，vue 叫 history），因为 hash 路由无法对应到实际的物理路由。（即线上渲染时 history 下，如果 form 路由被设置成预渲染，那么访问 /form/ 路由时，会直接从服务端返回 form 文件夹下的 index.html，之前打包时就已经预先生成了完整的 HTML 文件 ）
-
-<img src="./assets/prerender-spa-plugin.png" width="1200"/>
-
-本项目已经集成了 prerender-spa-plugin，但由于和 vue-stack-page/vue-navigation 这类路由堆栈管理器一起使用有问题（原因还在查找，如果知道的朋友也可以告知下），所以 prerender 功能是关闭的。
-
-同时推荐几篇相关文章：
-
-[vue 预渲染之 prerender-spa-plugin 解析(一)](https://blog.csdn.net/vv_bug/article/details/84593052)
-
-[使用预渲提升 SPA 应用体验](https://juejin.im/post/5d5fa22ee51d4561de20b5f5)
-
-## 手势库
-
-[hammer.js](https://github.com/hammerjs/hammer.js)
-
-[AlloyFinger](https://github.com/AlloyTeam/AlloyFinger)
-
-在移动端开发中，一般都需要支持一些手势，例如拖动（Pan）,缩放（Pinch）,旋转（Rotate）,滑动（swipe）等。目前已经有很成熟的方案了，例如 hammer.js 和腾讯前端团队开发的 AlloyFinger 都很不错。本项目选择基于 hammer.js 进行二次封装成 vue 指令集，各位可根据项目需求选择不同的方案。
-
-下面是二次封装的关键代码，其中用到了 webpack 的 require.context 函数来获取特定模块的上下文，主要用来实现自动化导入模块，比较适用于像 vue 指令这种模块较多的场景：
-
-```ts
-// 用于导入模块的上下文
-export const importAll = (
-  context: __WebpackModuleApi.RequireContext,
-  options: ImportAllOptions = {}
-): AnyObject => {
-  const { useDefault = true, keyTransformFunc, filterFunc } = options;
-
-  let keys = context.keys();
-
-  if (isFunction(filterFunc)) {
-    keys = keys.filter(filterFunc);
-  }
-
-  return keys.reduce((acc: AnyObject, curr: string) => {
-    const key = isFunction(keyTransformFunc) ? keyTransformFunc(curr) : curr;
-    acc[key] = useDefault ? context(curr).default : context(curr);
-    return acc;
-  }, {});
-};
-
-// directives 文件夹下的 index.ts
-const directvieContext = require.context('./', false, /\.ts$/);
-const directives = importAll(directvieContext, {
-  filterFunc: (key: string) => key !== './index.ts',
-  keyTransformFunc: (key: string) =>
-    key.replace(/^\.\//, '').replace(/\.ts$/, '')
-});
-
-export default {
-  install(vue: typeof Vue): void {
-    Object.keys(directives).forEach((key) =>
-      vue.directive(key, directives[key])
-    );
-  }
-};
-
-// touch.ts
-export default {
-  bind(el: HTMLElement, binding: DirectiveBinding) {
-    const hammer: HammerManager = new Hammer(el);
-    const touch = binding.arg as Touch;
-    const listener = binding.value as HammerListener;
-    const modifiers = Object.keys(binding.modifiers);
-
-    switch (touch) {
-      case Touch.Pan:
-        const panEvent = detectPanEvent(modifiers);
-        hammer.on(`pan${panEvent}`, listener);
-        break;
-      ...
-    }
+```js
+// 从 UA 获取设备相关信息并在全局初始化
+export const initPlatform = () => {
+  const UA = navigator.userAgent;
+  const info = UA.match(/\s{1}DSBRIDGE[\w\.]+$/g);
+  if (info && info.length > 0) {
+    const infoArray = info[0].split('_');
+    window.$appVersion = infoArray[1];
+    window.$systemVersion = infoArray[2];
+    window.$platform = infoArray[3] as Platform;
+  } else {
+    window.$appVersion = '1.0.0';
+    window.$systemVersion = undefined;
+    window.$platform = 'browser';
   }
 };
 ```
 
-另外推荐一篇关于 hammer.js 和一篇关于 require.context 的文章：
+### 优雅的限制接口调用
 
-[H5 案例分享：JS 手势框架 —— Hammer.js](https://www.h5anli.com/articles/201609/hammerjs.html)
+然后就要思考在当前环境不满足接口调用的条件时（例如客户端版本过低、只支持 iOS 端等），如何限制接口的调用？比较直接的办法就是在调用接口的业务代码做判断，或者直接在封装的接口方法里进行判断，无论哪种都会显得冗余。这里笔者推荐使用装饰器方式对接口的方法进行装饰，如果不满足条件，则重写被装饰的方法，里面可以加些提示用户的逻辑。（前提是类的实例方法，因为装饰器只能修饰类和类的方法）。
 
-[使用 require.context 实现前端工程自动化](https://www.jianshu.com/p/c894ea00dfec)
+下面就是装饰器方法的定义和使用方式:
+
+```js
+/**
+ * 限制接口调用的平台和客户端版本
+ * 实际情况中多个平台客户端版本不一致，可以根据项目需求对下面的函数做修改
+ * @param {string} [platforms=['android', 'ios']]
+ * @param {string} [version='1.0.0']
+ * @returns
+ */
+function limit(platforms = ['android', 'ios'], version = '1.0.0') {
+  return (target: AnyObject, name: string, descriptor: PropertyDescriptor) => {
+    if (!platforms.includes(window.$platform)) {
+      descriptor.value = () => {
+        return Vue.prototype.$toast(
+          `当前处在 ${window.$platform} 环境，无法调用接口哦`
+        );
+      };
+
+      return descriptor;
+    }
+
+    if (
+      window.$appVersion &&
+      compareVersions.compare(version, window.$appVersion, '>')
+    ) {
+      descriptor.value = () => {
+        return Vue.prototype.$toast(
+          `当前客户端版本过低，请升级到 ${version} 以上版本`
+        );
+      };
+
+      return descriptor;
+    }
+  };
+}
+
+export class NativeService implements INativeService {
+  // 同步到日历
+  @limit(['android', 'ios'], '1.0.1')
+  public syncCalendar(params: SyncCalendarParams, onSuccess: () => void): void {
+    ...
+  }
+}
+```
 
 ## 样式适配
 
@@ -634,7 +1148,7 @@ export default {
 
 下面是 vw 和 rem 的优缺点对比图：
 
-<img src="./assets/vw-rem.png" width="1200"/>
+<img src="https://i.loli.net/2020/02/29/uDBz1Ndc5iFvQtH.png" width="1200"/>
 
 关于 vw 兼容性问题，目前在移动端 iOS 8 以上以及 Android 4.4 以上获得支持。如果有兼容更低版本需求的话，可以选择 viewport 的 pollify 方案，其中比较主流的是 [Viewport Units Buggyfill](https://github.com/rodneyrehm/viewport-units-buggyfill)。
 
@@ -733,64 +1247,101 @@ class ValidatorUtils {
 }
 ```
 
-## 通过 UA 获取设备信息
+## 手势库
 
-在开发 h5 开发时，可能会遇到下面几种情况：
+[hammer.js](https://github.com/hammerjs/hammer.js)
 
-1. 开发时都是在浏览器进行开发调试的，所以需要避免调用 native 的接口，因为这些接口在浏览器环境根本不存在；
-2. 有些情况需要区分所在环境是在 android webview 还是 ios webview，做一些针对特定平台的处理；
-3. 当 h5 版本已经更新，但是客户端版本并没有同步更新，那么如果之间的接口调用发生了改变，就会出现调用出错。
+[AlloyFinger](https://github.com/AlloyTeam/AlloyFinger)
 
-所以需要一种方式来检测页面当前所处设备的平台类型、app 版本、系统版本等，目前比较靠谱的方式是通过 android / ios webview 修改 UserAgent，在原有的基础上加上特定后缀，然后在网页就可以通过 UA 获取设备相关信息了。当然这种方式的前提是 native 代码是可以为此做出改动的。以安卓为例关键代码如下：
+在移动端开发中，一般都需要支持一些手势，例如拖动（Pan）,缩放（Pinch）,旋转（Rotate）,滑动（swipe）等。目前已经有很成熟的方案了，例如 hammer.js 和腾讯前端团队开发的 AlloyFinger 都很不错。本项目选择基于 hammer.js 进行二次封装成 vue 指令集，各位可根据项目需求选择不同的方案。
 
-安卓关键代码：
-
-```java
-// Activity -> onCreate
-...
-// 获取 app 版本
-PackageManager packageManager = getPackageManager();
-PackageInfo packInfo = null;
-try {
-  // getPackageName()是你当前类的包名，0代表是获取版本信息
-  packInfo = packageManager.getPackageInfo(getPackageName(),0);
-} catch (PackageManager.NameNotFoundException e) {
-  e.printStackTrace();
-}
-String appVersion = packInfo.versionName;
-
-// 获取系统版本
-String systemVersion = android.os.Build.VERSION.RELEASE;
-
-mWebSettings.setUserAgentString(
-  mWebSettings.getUserAgentString() + " DSBRIDGE_"  + appVersion + "_" + systemVersion + "_android"
-);
-```
-
-h5 关键代码：
+下面是二次封装的关键代码，其中用到了 webpack 的 require.context 函数来获取特定模块的上下文，主要用来实现自动化导入模块，比较适用于像 vue 指令这种模块较多的场景：
 
 ```ts
-const initDeviceInfo = () => {
-  const UA = navigator.userAgent;
-  const info = UA.match(/\s{1}DSBRIDGE[\w\.]+$/g);
-  if (info && info.length > 0) {
-    const infoArray = info[0].split('_');
-    window.$appVersion = infoArray[1];
-    window.$systemVersion = infoArray[2];
-    window.$platform = infoArray[3] as Platform;
-  } else {
-    window.$appVersion = undefined;
-    window.$systemVersion = undefined;
-    window.$platform = 'browser';
+// 用于导入模块的上下文
+export const importAll = (
+  context: __WebpackModuleApi.RequireContext,
+  options: ImportAllOptions = {}
+): AnyObject => {
+  const { useDefault = true, keyTransformFunc, filterFunc } = options;
+
+  let keys = context.keys();
+
+  if (isFunction(filterFunc)) {
+    keys = keys.filter(filterFunc);
+  }
+
+  return keys.reduce((acc: AnyObject, curr: string) => {
+    const key = isFunction(keyTransformFunc) ? keyTransformFunc(curr) : curr;
+    acc[key] = useDefault ? context(curr).default : context(curr);
+    return acc;
+  }, {});
+};
+
+// directives 文件夹下的 index.ts
+const directvieContext = require.context('./', false, /\.ts$/);
+const directives = importAll(directvieContext, {
+  filterFunc: (key: string) => key !== './index.ts',
+  keyTransformFunc: (key: string) =>
+    key.replace(/^\.\//, '').replace(/\.ts$/, '')
+});
+
+export default {
+  install(vue: typeof Vue): void {
+    Object.keys(directives).forEach((key) =>
+      vue.directive(key, directives[key])
+    );
+  }
+};
+
+// touch.ts
+export default {
+  bind(el: HTMLElement, binding: DirectiveBinding) {
+    const hammer: HammerManager = new Hammer(el);
+    const touch = binding.arg as Touch;
+    const listener = binding.value as HammerListener;
+    const modifiers = Object.keys(binding.modifiers);
+
+    switch (touch) {
+      case Touch.Pan:
+        const panEvent = detectPanEvent(modifiers);
+        hammer.on(`pan${panEvent}`, listener);
+        break;
+      ...
+    }
   }
 };
 ```
 
-## mock 数据
+另外推荐一篇关于 hammer.js 和一篇关于 require.context 的文章：
 
-[Mock](https://github.com/nuysoft/Mock)
+[H5 案例分享：JS 手势框架 —— Hammer.js](https://www.h5anli.com/articles/201609/hammerjs.html)
 
-当前后端进度不一致，接口还尚未实现时，为了不影响彼此的进度，此时前后端约定好接口数据格式后，前端就可以使用 mock 数据进行独立开发了。本项目使用了 Mock 实现前端所需的接口。
+[使用 require.context 实现前端工程自动化](https://www.jianshu.com/p/c894ea00dfec)
+
+## Webpack 策略
+
+### 基础库抽离
+
+对于一些基础库，例如 vue、moment 等，属于不经常变化的静态依赖，一般需要抽离出来以提升每次构建的效率。目前主流方案有两种：
+
+一种是使用 [webpack-dll-plugin](https://webpack.docschina.org/plugins/dll-plugin/) 插件，在首次构建时就讲这些静态依赖单独打包，后续只需引入早已打包好的静态依赖包即可；
+
+另一种就是外部扩展 [Externals](https://webpack.docschina.org/configuration/externals/) 方式，即把不需要打包的静态资源从构建中剔除，使用 CDN 方式引入。下面是 webpack-dll-plugin 相对 Externals 的缺点：
+
+1. 需要配置在每次构建时都不参与编译的静态依赖，并在首次构建时为它们预编译出一份 JS 文件（后文将称其为 lib 文件），每次更新依赖需要手动进行维护，一旦增删依赖或者变更资源版本忘记更新，就会出现 Error 或者版本错误。
+
+2. 无法接入浏览器的新特性 script type="module"，对于某些依赖库提供的原生 ES Modules 的引入方式（比如 vue 的新版引入方式）无法得到支持，没法更好地适配高版本浏览器提供的优良特性以实现更好地性能优化。
+
+3. 将所有资源预编译成一份文件，并将这份文件显式注入项目构建的 HTML 模板中，这样的做法，在 HTTP1 时代是被推崇的，因为那样能减少资源的请求数量，但在 HTTP2 时代如果拆成多个 CDN Link，就能够更充分地利用 HTTP2 的多路复用特性。
+
+不过选择 Externals 还是需要一个靠谱的 CDN 服务的。
+
+本项目选择的是 Externals，各位可根据项目需求选择不同的方案。
+
+更多内容请查看这篇文章（上面观点来自于这篇文章）：
+
+[Webpack 优化——将你的构建效率提速翻倍](https://juejin.im/post/5d614dc96fb9a06ae3726b3e)
 
 ## 调试控制台
 
@@ -829,183 +1380,6 @@ const initDeviceInfo = () => {
 推荐一篇不错的 charles 使用教程：
 
 [解锁 Charles 的姿势](https://juejin.im/post/5a1033d2f265da431f4aa81f)
-
-## 异常监控平台
-
-[sentry](https://github.com/getsentry/sentry)
-
-[fundebug](https://www.fundebug.com/)
-
-移动端网页相对 PC 端，主要有设备众多，网络条件各异，调试困难等特点。导致如下问题：
-
-- 设备兼容或网络异常导致只有部分情况下才出现的 bug，测试无法全面覆盖
-
-- 无法获取出现 bug 的用户的设备，又不能复现反馈的 bug
-
-- 部分 bug 只出现几次，后面无法复现，不能还原事故现场
-
-这时就非常需要一个异常监控平台，将异常实时上传到平台，并及时通知相关人员。
-
-相关工具有 sentry，fundebug 等，其中 sentry 因为功能强大，支持多平台监控（不仅可以监控前端项目），完全开源，可以私有化部署等特点，而被广泛采纳。
-
-下面是 sentry 在本项目应用时使用的相关配套工具。
-
-**sentry 针对 javascript 的 sdk**
-
-[sentry-javascript](https://github.com/getsentry/sentry-javascript)
-
-**自动上传 sourcemap 的 webpack 插件**
-
-[sentry-webpack-plugin](https://github.com/getsentry/sentry-webpack-plugin)
-
-**编译时自动在 try catch 中添加错误上报函数的 babel 插件**
-
-[babel-plugin-try-catch-error-report](https://github.com/mcuking/babel-plugin-try-catch-error-report)
-
-**补充：**
-
-前端的异常主要有以下几个部分：
-
-- 静态资源加载异常
-
-- 接口异常（包括与后端和 native 的接口）
-
-- js 报错
-
-- 网页崩溃
-
-其中静态资源加载失败，可以通过 window.addEventListener('error', ..., true) 在事件捕获阶段获取，然后筛选出资源加载失败的错误并手动上报错误。核心代码如下：
-
-```ts
-// 全局监控资源加载错误
-window.addEventListener(
-  'error',
-  (event) => {
-    // 过滤 js error
-    const target = event.target || event.srcElement;
-    const isElementTarget =
-      target instanceof HTMLScriptElement ||
-      target instanceof HTMLLinkElement ||
-      target instanceof HTMLImageElement;
-    if (!isElementTarget) {
-      return false;
-    }
-    // 上报资源地址
-    const url =
-      (target as HTMLScriptElement | HTMLImageElement).src ||
-      (target as HTMLLinkElement).href;
-
-    this.log({
-      error: new Error(`ResourceLoadError: ${url}`),
-      type: 'resource load'
-    });
-  },
-  true
-);
-```
-
-关于服务端接口异常，可以通过在封装的 http 模块中，全局集成上报错误函数（native 接口的错误上报类似，可在项目中查看）。核心代码如下：
-
-```ts
-function errorReport(
-  url: string,
-  error: string | Error,
-  requestOptions: AxiosRequestConfig,
-  response?: AnyObject
-) {
-  if (window.$sentry) {
-    const errorInfo: RequestErrorInfo = {
-      error: typeof error === 'string' ? new Error(error) : error,
-      type: 'request',
-      requestUrl: url,
-      requestOptions: JSON.stringify(requestOptions)
-    };
-
-    if (response) {
-      errorInfo.response = JSON.stringify(response);
-    }
-
-    window.$sentry.log(errorInfo);
-  }
-}
-```
-
-关于全局 js 报错，sentry 针对的前端的 sdk 已经通过 window.onerror 和 window.addEventListener('unhandledrejection', ..., false) 进行全局监听并上报。
-
-需要注意的是其中 window.onerror = (message, source, lineno, colno, error) =>{} 不同于 window.addEventListener('error', ...)，window.onerror 捕获的信息更丰富，包括了错误字符串信息、发生错误的 js 文件，错误所在的行数、列数、和 Error 对象（其中还会有调用堆栈信息等）。所以 sentry 会选择 window.onerror 进行 js 全局监控。
-
-但有一种错误是 window.onerror 监听不到的，那就是 unhandledrejection 错误，这个错误是当 promise reject 后没有 catch 住所引起的。当然 sentry 的 sdk 也已经做了监听。
-
-针对 vue 项目，也可对 errorHandler 钩子进行全局监听，react 的话可以通过 componentDidCatch 钩子，vue 相关代码如下：
-
-```ts
-// 全局监控 Vue errorHandler
-Vue.config.errorHandler = (error, vm, info) => {
-  window.$sentry.log({
-    error,
-    type: 'vue errorHandler',
-    vm,
-    info
-  });
-};
-```
-
-但是对于我们业务中，经常会对一些以报错代码使用 try catch，这些错误如果没有在 catch 中向上抛出，是无法通过 window.onerror 捕获的，针对这种情况，笔者开发了一个 babel 插件 [babel-plugin-try-catch-error-report](https://github.com/mcuking/babel-plugin-try-catch-error-report)，该插件可以在 [babel](https://babeljs.io/) 编译 js 的过程中，通过在 ast 中查找 catch 节点，然后再 catch 代码块中自动插入错误上报函数，可以自定义函数名，和上报的内容（源码所在文件，行数，列数，调用栈，以及当前 window 属性，比如当前路由信息 window.location.href）。相关配置代码如下：
-
-```js
-if (!IS_DEV) {
-  plugins.push([
-    'try-catch-error-report',
-    {
-      expression: 'window.$sentry.log',
-      needFilename: true,
-      needLineNo: true,
-      needColumnNo: false,
-      needContext: true,
-      exclude: ['node_modules']
-    }
-  ]);
-}
-```
-
-针对跨域 js 问题，当加载的不同域的 js 文件时，例如通过 cdn 加载打包后的 js。如果 js 报错，window.onerror 只能捕获到 script error，没有任何有效信息能帮助我们定位问题。此时就需要我们做一些事情：
-第一步、服务端需要在返回 js 的返回头设置 Access-Control-Allow-Origin: \*
-第二部、设置 script 标签属性 crossorigin，代码如下：
-
-```html
-<script src="http://helloworld/main.js" crossorigin></script>
-```
-
-如果是动态添加的，也可动态设置：
-
-```js
-const script = document.createElement('script');
-script.crossOrigin = 'anonymous';
-script.src = url;
-document.body.appendChild(script);
-```
-
-针对网页崩溃问题，推荐一个基于 service work 的监控方案，相关文章已列在下面的。如果是 webview 加载网页，也可以通过 webview 加载失败的钩子监控网页崩溃等。
-
-[如何监控网页崩溃？](https://juejin.im/entry/5be158116fb9a049c6434f4a)
-
-最后，因为部署到线上的代码一般都是经过压缩混淆的，如果没有上传 sourcemap 的话，是无法定位到具体源码的，可以现在 项目中添加 .sentryclirc 文件，其中内容可参考本项目的 .sentryclirc，然后通过 sentry-cli (需要全局全装 sentry-cli 即`npm install sentry-cli`)命令行工具进行上传，命令如下：
-
-```
-sentry-cli releases -o 机构名 -p 项目名 files 版本 upload-sourcemaps sourcemap 文件相对位置 --url-prefix js 在线上相对根目录的位置 --rewrite
-// 示例
-sentry-cli releases -o mcukingdom -p hello-world files 0.2.1 upload-sourcemaps dist/js --url-prefix '~/js/' --rewrite
-```
-
-当然官方也提供了 webpack 插件 [sentry-webpack-plugin](https://github.com/getsentry/sentry-webpack-plugin)，当打包时触发 webpack 的 after-emit 事件钩子（即生成资源到 output 目录之后），插件会自动上传打包目录中的 sourcemap 和关联的 js，相关配置可参考本项目的 vue.config.js 文件。
-
-通常为了安全，是不允许在线上部署 sourcemap 文件的，所以上传 sourcemap 到 sentry 后，可手动删除线上 sourcemap 文件。
-
-## 性能监控平台
-
-[performance](https://developer.mozilla.org/zh-CN/docs/Web/API/Window/performance)
-
-todo
 
 ## 部署
 

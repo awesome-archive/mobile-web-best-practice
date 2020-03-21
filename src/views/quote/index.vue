@@ -2,12 +2,12 @@
   <div class="layout__page">
     <div class="layout__header">
       <van-nav-bar title="名言警句三百篇"
-                   left-text="返回"
                    left-arrow
                    @click-left="handleClickLeft" />
     </div>
-    <div class="layout__body">
-      <van-cell-group>
+    <div class="layout__body"
+         v-touch:swipe="handleSwipeRight">
+      <van-cell-group class="info__list">
         <van-cell v-for="item in list"
                   :key="item.id"
                   :title="`${item.content}  --${item.creator}`" />
@@ -22,8 +22,9 @@
 </template>
 
 <script lang="ts">
-import { Component, Vue } from 'vue-property-decorator';
-import commonInteractor from '@/use-cases/common-interactor';
+import { Component, Vue, Mixins } from 'vue-property-decorator';
+import SwipeRightMixin from '@/utils/swipe-right-mixin';
+import { commonInteractor } from '@/core';
 import LocalConfig from '@/config.json';
 import { IQuote } from '@/types';
 
@@ -36,7 +37,7 @@ Vue.use(NavBar)
   .use(Loading);
 
 @Component
-export default class Quote extends Vue {
+export default class Quote extends Mixins(SwipeRightMixin) {
   private list: IQuote[] = [];
 
   private isLoading = false;
@@ -61,7 +62,12 @@ export default class Quote extends Vue {
   }
 }
 </script>
+
 <style lang="less" scoped>
+.info__list {
+  margin-top: 20px;
+}
+
 .info__loading-wrapper {
   display: flex;
   justify-content: center;

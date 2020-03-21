@@ -1,5 +1,4 @@
 import Vue from 'vue';
-import VuePageStack from 'vue-page-stack';
 import { Toast, Dialog } from 'vant';
 
 import App from './App.vue';
@@ -41,22 +40,12 @@ initPlatform();
 
 Vue.config.productionTip = false;
 
-Vue.use(Toast)
-  .use(Dialog)
-  .use(GlobalMethods)
-  .use(Directives);
-
-if (LocalConfig.VuePageStackEnabled) {
-  Vue.use(VuePageStack, { router });
-}
+Vue.use(GlobalMethods)
+  .use(Directives)
+  .use(Toast)
+  .use(Dialog);
 
 new Vue({
   router,
-  render: (h) => h(App),
-  mounted() {
-    if (LocalConfig.PreRenderEnabled) {
-      // 触发 renderAfterDocumentEvent
-      document.dispatchEvent(new Event('render-event'));
-    }
-  }
+  render: (h) => h(App)
 }).$mount('#app');

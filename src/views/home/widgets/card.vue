@@ -3,7 +3,7 @@
     <div class="card__title"
          :class="notebook.themeColor"
          @click="$emit('edit-notebook', notebook.id)">
-      {{notebook.name}}
+      {{ notebook.name }}
     </div>
     <draggable class="list-group"
                tag="ul"
@@ -15,7 +15,7 @@
         <li class="card__note"
             v-for="(note, j) in notebook.notes"
             :key="note.id"
-            :class="{'last': j === notebook.notes.length -1}"
+            :class="{ last: j === notebook.notes.length - 1 }"
             @click.stop="$emit('edit-note', note.id, notebook.id)">
           <div class="card__note-action--drag">
             <i class="iconfont memo-icon-drag-hand extend-click"></i>
@@ -23,12 +23,14 @@
           <div class="card__note-main">
             <div class="card__note-left">
               <span class="card__note-name ellipsis"
-                    :class="{'done': note.isDone}">
-                {{note.name}}
+                    :class="{ done: note.isDone }">
+                {{ note.name }}
               </span>
               <div v-if="note.deadlineStr"
                    class="card__note-time ellipsis"
-                   :class="{'expire': note.isExpire, 'done': note.isDone}">{{note.deadlineStr}}</div>
+                   :class="{ expire: note.isExpire, done: note.isDone }">
+                {{ note.deadlineStr }}
+              </div>
             </div>
             <div class="card__note-right">
               <div v-if="note.isSync"
@@ -78,6 +80,7 @@ export default class Card extends Vue {
   };
 }
 </script>
+
 <style lang="less" scoped>
 @import '~@/less/var.less';
 
@@ -98,6 +101,9 @@ export default class Card extends Vue {
   padding: 6px 12px;
   border-radius: 4px;
   color: #fff;
+  &:active {
+    opacity: 0.6;
+  }
   &.red {
     background: @red-level;
   }

@@ -1,47 +1,52 @@
 <template>
-  <div class="layout__page">
-    <div class="layout__header">
-      <timer></timer>
-    </div>
-    <div class="layout__body">
-      <div v-if="!notebooks.length && hasRequest"
-           class="list-no-content-tip">
-        时不我待，抓紧建个任务吧~
+  <div style="position: relative; height: 100%;">
+    <div class="layout__page">
+      <div class="layout__header">
+        <timer />
       </div>
-      <van-list v-if="notebooks.length > 0"
-                v-model="loading"
-                :finished="finished"
-                finished-text="没有更多了"
-                :immediate-check="false"
-                @load="getNotebookList({page: query.page + 1})">
-        <div v-for="(notebook, i) in notebooks"
-             class="home__notebook-card-wrapper"
-             :class="{'last': i === notebooks.length -1}"
-             :key="notebook.id">
-          <card :notebook="notebook"
-                @edit-notebook="handleEditNotebookClick"
-                @edit-note="handleEditNoteClick"
-                @toggle-done-status="toggleDoneStatus"
-                @update-note-order="updateNoteOrder"
-                @create-note="handleCreateNoteClick"></card>
+      <div class="layout__body">
+        <div v-if="!notebooks.length && hasRequest"
+             class="list-no-content-tip">
+          时不我待，抓紧建个任务吧~
         </div>
-      </van-list>
+        <van-list v-if="notebooks.length > 0"
+                  v-model="loading"
+                  :finished="finished"
+                  finished-text="没有更多了"
+                  :immediate-check="false"
+                  @load="getNotebookList({ page: query.page + 1 })">
+          <div v-for="(notebook, i) in notebooks"
+               class="home__notebook-card-wrapper"
+               :class="{ last: i === notebooks.length - 1 }"
+               :key="notebook.id">
+            <card :notebook="notebook"
+                  @edit-notebook="handleEditNotebookClick"
+                  @edit-note="handleEditNoteClick"
+                  @toggle-done-status="toggleDoneStatus"
+                  @update-note-order="updateNoteOrder"
+                  @create-note="handleCreateNoteClick"></card>
+          </div>
+        </van-list>
+      </div>
+      <router-link class="home__button--create-notebook"
+                   to="/home/notebook/create">
+        <van-button type="primary"
+                    size="normal"
+                    icon="plus"
+                    round>
+          新建任务集
+        </van-button>
+      </router-link>
     </div>
-    <div class="home__button--create-notebook"
-         id="fixed-bottom">
-      <van-button type="primary"
-                  size="normal"
-                  icon="plus"
-                  round
-                  @click="createNoteBook">新建任务集</van-button>
-    </div>
+    <transition>
+      <router-view class="above-loaded-page" />
+    </transition>
   </div>
 </template>
 
 <script lang="ts">
 import { Component, Vue } from 'vue-property-decorator';
-import notebookInteractor from '@/use-cases/notebook-interactor';
-import noteInteractor from '@/use-cases/note-interactor';
+import { notebookInteractor, noteInteractor } from '@/core';
 import LocalConfig from '@/config.json';
 import { INotebook, INote } from '@/types';
 
@@ -60,16 +65,16 @@ Vue.use(NavBar)
 export default class Home extends Vue {
   private notebooks: INotebook[] = [];
 
-  private loading = false;
-
-  private finished = false;
-
   private query = {
     page: 1,
     count: LocalConfig.ListQueryCount
   };
 
-  private total = 0;
+  private loading = false;
+
+  private finished = false;
+
+  private listTotal = 0;
 
   private hasRequest = false;
 
@@ -81,18 +86,21 @@ export default class Home extends Vue {
         this.query
       );
 
-      this.total = total;
+      this.listTotal = total;
 
       if (this.query.page === 1) {
         this.notebooks = data;
       } else {
         this.notebooks = [...this.notebooks, ...data];
       }
+
       this.hasRequest = true;
       this.loading = false;
-      if (this.notebooks.length >= this.total) {
+      if (this.notebooks.length >= this.listTotal) {
         this.finished = true;
       }
+
+      this.hasRequest = true;
     } catch (error) {
       console.log(error);
     }
@@ -118,16 +126,10 @@ export default class Home extends Vue {
     }
   }
 
-  private async createNoteBook() {
-    this.$router.push({
-      name: 'notebook.create'
-    });
-  }
-
   private async handleEditNotebookClick(id: number) {
     this.$router.push({
-      name: 'notebook.edit',
-      params: {
+      name: 'notebook.create',
+      query: {
         id: JSON.stringify(id)
       }
     });
@@ -144,36 +146,39 @@ export default class Home extends Vue {
 
   private async handleEditNoteClick(noteId: number, notebookId: number) {
     this.$router.push({
-      name: 'note.edit',
-      params: {
-        id: JSON.stringify(noteId)
-      },
+      name: 'note.create',
       query: {
+        id: JSON.stringify(noteId),
         notebookId: JSON.stringify(notebookId)
       }
     });
   }
 
-  private async activated() {
+  private async created() {
+    this.$bus.on('notebook-change', () => {
+      this.getNotebookList(this.query);
+    });
+
     this.getNotebookList({ page: 1, count: LocalConfig.ListQueryCount });
   }
 }
 </script>
+
 <style lang="less" scoped>
 @import '~@/less/var.less';
-
-.layout__body {
-  padding: 16px;
-}
 
 .layout__header {
   padding: 60px 16px 40px 16px;
   background: @background-color;
 }
 
+.layout__body {
+  padding: 16px;
+}
+
 .home__notebook-card-wrapper {
   margin-bottom: 30px;
-  &.last {
+  &:last-child {
     margin-bottom: 0;
   }
 }

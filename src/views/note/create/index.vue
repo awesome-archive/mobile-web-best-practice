@@ -2,14 +2,14 @@
   <div class="layout__page">
     <div class="layout__header">
       <van-nav-bar :title="isEdit ? '编辑任务' : '新建任务'"
-                   left-text="返回"
                    :right-text="isEdit ? '删除' : ''"
                    left-arrow
                    @click-left="handleClickLeft"
                    @click-right="confirmDeleteNote" />
     </div>
-    <div class="layout__body">
-      <van-cell-group>
+    <div class="layout__body"
+         v-touch:swipe="handleSwipeRight">
+      <van-cell-group class="note__create-form">
         <van-field v-model="formModel.name"
                    label="任务名称"
                    placeholder="请输入任务名称"
@@ -17,7 +17,7 @@
                    required />
         <van-cell title="截止时间"
                   :value="deadlineText"
-                  @click="selectDeadlineShow=true"
+                  @click="setSelectDeadlineShow(true)"
                   is-link></van-cell>
         <van-cell title="同步任务到手机日历"
                   @click="toggleSyncCalendar">
@@ -46,18 +46,22 @@
                            title="选择截止时间"
                            type="datetime"
                            :formatter="dateTimePickerFormatter"
-                           :min-date="new Date()"
-                           @cancel="selectDeadlineShow = false"
+                           :min-date="minDate"
+                           @cancel="setSelectDeadlineShow(false)"
                            @confirm="handleTimePickerConfirm" />
     </van-popup>
+    <transition>
+      <router-view class="above-loaded-page" />
+    </transition>
   </div>
 </template>
 
-<script lang='ts'>
-import { Component, Vue } from 'vue-property-decorator';
+<script lang="ts">
+import { Component, Vue, Mixins } from 'vue-property-decorator';
 import moment from 'moment';
 import ValidatorUtils from '@/utils/validate';
-import noteInteractor from '@/use-cases/note-interactor';
+import SwipeRightMixin from '@/utils/swipe-right-mixin';
+import { noteInteractor } from '@/core';
 import { dateTimePickerFormatter, createRandomNum } from '@/utils/common-tools';
 import { INote, ValidateError } from '@/types';
 
@@ -85,11 +89,12 @@ Vue.use(NavBar)
 @Component({
   components: {}
 })
-export default class NoteCreate extends Vue {
+export default class NoteCreate extends Mixins(SwipeRightMixin) {
   private get id() {
-    return this.$route.params.id
-      ? parseInt(this.$route.params.id, 10)
-      : undefined;
+    if (typeof this.$route.query.id === 'string') {
+      return parseInt(this.$route.query.id, 10);
+    }
+    return undefined;
   }
 
   private get notebookId() {
@@ -97,7 +102,7 @@ export default class NoteCreate extends Vue {
   }
 
   private get isEdit() {
-    return this.$route.name === 'note.edit';
+    return !!this.id;
   }
 
   private validator!: ValidatorUtils;
@@ -105,6 +110,8 @@ export default class NoteCreate extends Vue {
   private dateTimePickerFormatter = dateTimePickerFormatter;
 
   private selectDeadlineShow = false;
+
+  private minDate = new Date();
 
   private formModel: INote = {
     id: createRandomNum(20),
@@ -125,6 +132,10 @@ export default class NoteCreate extends Vue {
     this.$router.go(-1);
   }
 
+  private setSelectDeadlineShow(val: boolean) {
+    this.selectDeadlineShow = val;
+  }
+
   private handleMentionClick() {
     this.$router.push({
       name: 'quote'
@@ -135,7 +146,7 @@ export default class NoteCreate extends Vue {
     this.deadlineText = moment(this.formModel.deadline).format(
       'YYYY-MM-DD HH:mm:ss'
     );
-    this.selectDeadlineShow = false;
+    this.setSelectDeadlineShow(false);
   }
 
   private toggleSyncCalendar() {
@@ -159,6 +170,7 @@ export default class NoteCreate extends Vue {
   private async handleDeleteNote(notebookId: number, id: number) {
     try {
       await noteInteractor.deleteNote(notebookId, id);
+      this.$bus.emit('notebook-change');
       this.$router.go(-1);
     } catch (error) {
       console.log(error);
@@ -182,7 +194,7 @@ export default class NoteCreate extends Vue {
             };
             await noteInteractor.syncCalendar(params, notebookId);
           }
-
+          this.$bus.emit('notebook-change');
           this.$router.go(-1);
         } catch (error) {
           console.log(error);
@@ -224,8 +236,13 @@ export default class NoteCreate extends Vue {
   }
 }
 </script>
+
 <style lang="less" scoped>
 @import '~@/less/var.less';
+
+.note__create-form {
+  margin-top: 20px;
+}
 
 .note__create-form--metion {
   float: right;
